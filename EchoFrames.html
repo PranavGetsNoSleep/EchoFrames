@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beat Synced Image Visualizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --progress: 0%; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #000; color: #eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    canvas { display: block; }
+
+    /* Controls bar */
+    #controls {
+      position: fixed; bottom: 0; left: 0; width: 100%;
+      background: rgba(20, 20, 20, 0.85);
+      border-top: 2px solid #444;
+      padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; z-index: 10; backdrop-filter: blur(6px);
+    }
+
+    /* Left mini visualizer (contained) */
+    #miniVisualizer {
+      display: flex; align-items: flex-end;
+      gap: 3px; height: 40px; width: 140px;
+      overflow: hidden; /* prevent bleeding */
+    }
+    .bar {
+      flex: 1;
+      height: 8px;
+      border-radius: 2px;
+      background: linear-gradient(to top, #14a02e, #e3d21f); /* green -> yellow */
+      transition: height 0.08s ease;
+      box-shadow: 0 0 6px rgba(50, 205, 50, 0.6);
+      align-self: flex-end;
+    }
+
+    /* Center playbar cluster */
+    #playbar {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    }
+    #audioFile, #imageFiles {
+      color: #ddd; background: #222; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
+    }
+    #playPause {
+      background: #333; color: #fff; border: none; border-radius: 4px;
+      padding: 6px 12px; cursor: pointer; transition: background 0.2s;
+    }
+    #playPause:hover { background: #555; }
+
+    /* Progress bar */
+    #progressBar {
+      -webkit-appearance: none; appearance: none;
+      width: min(70vw, 700px); height: 10px; border-radius: 5px;
+      background: #222; outline: none; cursor: pointer;
+    }
+    #progressBar::-webkit-slider-runnable-track {
+      height: 10px; border-radius: 5px;
+      background: linear-gradient(to right, limegreen var(--progress), #222 var(--progress));
+      box-shadow: inset 0 0 6px #111;
+    }
+    #progressBar::-moz-range-track {
+      height: 10px; border-radius: 5px; background: #222;
+      box-shadow: inset 0 0 6px #111;
+    }
+    #progressBar::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: limegreen; box-shadow: 0 0 10px limegreen;
+      margin-top: -3px; transition: box-shadow 0.2s, transform 0.1s;
+    }
+    #progressBar:hover::-webkit-slider-thumb { box-shadow: 0 0 14px limegreen; transform: scale(1.05); }
+    #progressBar::-moz-range-thumb {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: limegreen; box-shadow: 0 0 10px limegreen; border: none;
+    }
+
+    /* Right info cluster */
+    #info { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    #info label { color: #ddd; font-size: 14px; }
+    #info input[type="range"] { width: 160px; }
+    #info .value { color: #0f0; font-weight: bold; }
+    #timeDisplay { min-width: 86px; text-align: right; }
+
+    /* Responsive tweaks */
+    @media (max-width: 720px) {
+      #miniVisualizer { width: 100px; }
+      #progressBar { width: min(80vw, 500px); }
+      #info input[type="range"] { width: 130px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <div id="controls">
+    <!-- Left: mini visualizer -->
+    <div id="miniVisualizer">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+
+    <!-- Center: playbar -->
+    <div id="playbar">
+      <input type="file" id="audioFile" accept="audio/*" />
+      <input type="file" id="imageFiles" accept="image/*" multiple />
+      <button id="playPause">Play</button>
+      <input type="range" id="progressBar" min="0" max="100" value="0" />
+    </div>
+
+    <!-- Right: controls + timing -->
+    <div id="info">
+      <label>Sensitivity:</label>
+      <input type="range" id="sensitivitySlider" min="1" max="1000" value="120" step="1" />
+      <span class="value" id="sensitivityValue">120</span>
+      <button id="autoCalibrate">Auto Calibrate</button>
+
+      <label>Fade speed:</label>
+      <input type="range" id="fadeSlider" min="0.01" max="0.2" value="0.05" step="0.01" />
+      <span class="value" id="fadeValue">0.05</span>
+
+      <span id="timeDisplay">0:00 / 0:00</span>
+    </div>
+  </div>
+
+  <script>
+    // Canvas
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // UI elements
+    const sensitivitySlider = document.getElementById("sensitivitySlider");
+    const sensitivityValue = document.getElementById("sensitivityValue");
+    const fadeSlider = document.getElementById("fadeSlider");
+    const fadeValue = document.getElementById("fadeValue");
+    const autoCalibrateBtn = document.getElementById("autoCalibrate");
+    const playPauseBtn = document.getElementById("playPause");
+    const progressBar = document.getElementById("progressBar");
+    const timeDisplay = document.getElementById("timeDisplay");
+    const miniBars = document.querySelectorAll(".bar");
+    const audioInput = document.getElementById("audioFile");
+    const imageInput = document.getElementById("imageFiles");
+
+    // Audio/Web Audio
+    let audio, audioCtx, source, analyser, dataArray;
+
+    // Visualizer state
+    let images = [];
+    let currentImageIndex = 0;
+    let lastBeatTime = 0;
+    let opacity = 0;
+    let fadingIn = true;
+
+    // Rolling sensitivity calibration
+    let energyHistory = [];
+    const HISTORY_SIZE = 100; // ~5s
+    const CALIBRATE_INTERVAL_MS = 1000;
+    let calibrationTimer = null;
+    let calibrationWarmup = 0; // skip early ticks to avoid initial spike
+
+    // Mouse trail particles
+    const particles = [];
+    const MAX_PARTICLES = 180;
+    const TRAIL_COLOR = "rgba(50,205,50,";
+    const TRAIL_SIZE_MIN = 2, TRAIL_SIZE_MAX = 6;
+
+    sensitivitySlider.addEventListener("input", () => {
+      sensitivityValue.textContent = sensitivitySlider.value;
+    });
+    fadeSlider.addEventListener("input", () => {
+      fadeValue.textContent = fadeSlider.value;
+    });
+
+    // File inputs
+    imageInput.addEventListener("change", (e) => {
+      images = [];
+      for (const file of e.target.files) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        images.push(img);
+      }
+      currentImageIndex = 0;
+      opacity = 0;
+      fadingIn = true;
+    });
+
+    audioInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        audio = new Audio(ev.target.result);
+        setupWebAudio(audio);
+        wirePlaybackUI(audio);
+        audio.play();
+        playPauseBtn.textContent = "Pause";
+        startDrawLoop();
+        startContinuousCalibration();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function setupWebAudio(audioEl) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      source = audioCtx.createMediaElementSource(audioEl);
+      analyser = audioCtx.createAnalyser();
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      analyser.fftSize = 256;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+    }
+
+    function wirePlaybackUI(audioEl) {
+      audioEl.addEventListener("timeupdate", () => {
+        const progress = (audioEl.currentTime / audioEl.duration) * 100;
+        progressBar.value = progress || 0;
+        progressBar.style.setProperty("--progress", `${progress}%`);
+        timeDisplay.textContent = formatTime(audioEl.currentTime) + " / " + formatTime(audioEl.duration);
+      });
+
+      progressBar.addEventListener("input", () => {
+        const newTime = (progressBar.value / 100) * audioEl.duration;
+        audioEl.currentTime = newTime;
+      });
+
+      playPauseBtn.addEventListener("click", () => togglePlay(audioEl));
+
+      document.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && audioEl) {
+          e.preventDefault();
+          togglePlay(audioEl);
+        }
+      });
+    }
+
+    function togglePlay(audioEl) {
+      if (!audioEl) return;
+      if (audioEl.paused) {
+        audioEl.play();
+        playPauseBtn.textContent = "Pause";
+      } else {
+        audioEl.pause();
+        playPauseBtn.textContent = "Play";
+      }
+    }
+
+    function formatTime(sec) {
+      if (!sec || isNaN(sec)) return "0:00";
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    // Energy helpers
+    function getMidRangeEnergy(array) {
+      const start = 20, end = 80; // mid frequencies
+      let sum = 0;
+      for (let i = start; i < end; i++) sum += array[i];
+      return sum / (end - start);
+    }
+
+    // Manual auto-calibrate (3s snapshot)
+    autoCalibrateBtn.addEventListener("click", () => {
+      if (!analyser) return;
+      let samples = [];
+      const startTime = performance.now();
+      function collect() {
+        analyser.getByteFrequencyData(dataArray);
+        samples.push(getMidRangeEnergy(dataArray));
+        if (performance.now() - startTime < 3000) {
+          requestAnimationFrame(collect);
+        } else {
+          const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+          let threshold = Math.round(avg * 1.2);
+          threshold = clamp(threshold, 50, 600);
+          sensitivitySlider.value = threshold;
+          sensitivityValue.textContent = threshold;
+        }
+      }
+      collect();
+    });
+
+    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+    function startContinuousCalibration() {
+      if (calibrationTimer) clearInterval(calibrationTimer);
+      calibrationWarmup = 0; // reset warmup
+      calibrationTimer = setInterval(() => {
+        if (!analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        const currentEnergy = getMidRangeEnergy(dataArray);
+
+        energyHistory.push(currentEnergy);
+        if (energyHistory.length > HISTORY_SIZE) energyHistory.shift();
+
+        // Warmup: collect initial frames to avoid jumping the slider early
+        if (calibrationWarmup < 5) { // ~30 seconds if interval=1s; adjust if needed
+          calibrationWarmup++;
+          return;
+        }
+
+        const avg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+        let target = Math.round(avg * 1.2);
+        target = clamp(target, 50, 600);
+
+        const current = parseInt(sensitivitySlider.value);
+        const lerped = Math.round(current + (target - current) * 0.1); // smoother
+        sensitivitySlider.value = lerped;
+        sensitivityValue.textContent = lerped;
+      }, CALIBRATE_INTERVAL_MS);
+    }
+
+    // Mouse trail
+    window.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      spawnParticle(x, y);
+      spawnParticle(x + rand(-6, 6), y + rand(-6, 6));
+    });
+    function spawnParticle(x, y) {
+      particles.push({
+        x, y,
+        vx: rand(-0.8, 0.8),
+        vy: rand(-0.8, 0.8),
+        life: rand(0.6, 1.2), age: 0,
+        size: rand(2, 6)
+      });
+      if (particles.length > MAX_PARTICLES) particles.shift();
+    }
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+
+    // Main draw loop
+    let lastTime = performance.now();
+    function startDrawLoop() { requestAnimationFrame(draw); }
+
+    function draw(now = performance.now()) {
+      requestAnimationFrame(draw);
+      const dt = (now - lastTime) / 1000; lastTime = now;
+
+      if (analyser) analyser.getByteFrequencyData(dataArray);
+
+      // Clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw current image with fade-in
+      if (images.length > 0) {
+        const img = images[currentImageIndex];
+        if (fadingIn) {
+          opacity += parseFloat(fadeSlider.value);
+          if (opacity >= 1) { opacity = 1; fadingIn = false; }
+        }
+        ctx.globalAlpha = opacity;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = "lime";
+        ctx.font = "28px monospace";
+        ctx.fillText("Upload audio + images to begin", 24, 50);
+      }
+
+      // Beat detection and image switching
+      if (analyser) {
+        const midEnergy = getMidRangeEnergy(dataArray);
+        const threshold = parseInt(sensitivitySlider.value);
+        if (midEnergy > threshold && now - lastBeatTime > 300) {
+          currentImageIndex = (currentImageIndex + 1) % images.length;
+          lastBeatTime = now;
+          opacity = 0; fadingIn = true;
+        }
+      }
+
+      // Mini blocky visualizer — capped height for natural motion
+      if (analyser) {
+        const barCount = miniBars.length;
+        const step = Math.floor(dataArray.length / barCount) || 1;
+        const maxHeight = 30; // keep below container height (40px)
+        miniBars.forEach((bar, i) => {
+          const v = dataArray[i * step] || 0;
+          const h = Math.min(maxHeight, Math.max(6, v / 4)); // gentler scaling
+          bar.style.height = `${h}px`;
+        });
+      }
+
+      // Mouse trail particles
+      renderParticles(dt);
+    }
+
+    function renderParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.age += dt;
+        if (p.age > p.life) { particles.splice(i, 1); continue; }
+        p.x += p.vx * 60 * dt;
+        p.y += p.vy * 60 * dt;
+        const alpha = Math.max(0, 1 - p.age / p.life);
+        ctx.fillStyle = `${TRAIL_COLOR}${alpha})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  </script>
+</body>
+</html>
