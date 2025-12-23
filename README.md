@@ -1,5 +1,7 @@
 # EchoFrames
 Audio‑reactive visualizer powered by the Web Audio API. Syncs image fades to spectral energy and beat detection, with adaptive sensitivity, automated fade speed, and a sleek UI.
+Check out live page @ https://pranavgetsnosleep.github.io/EchoFrames/
+
 # EchoFrames 🎶🖼️
 
 EchoFrames is an audio‑reactive visualizer built with the Web Audio API.  
