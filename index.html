@@ -41,7 +41,7 @@
       flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
     }
     #audioFile, #imageFiles {
-      color: #ddd; background: #222; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
+      color: #ddd; background: #fb8e22; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
     }
     #playPause {
       background: #333; color: #fff; border: none; border-radius: 4px;
@@ -256,7 +256,7 @@
 
     // Energy helpers
     function getMidRangeEnergy(array) {
-      const start = 20, end = 80; // mid frequencies
+      const start = 10, end = 110; // mid frequencies
       let sum = 0;
       for (let i = start; i < end; i++) sum += array[i];
       return sum / (end - start);
