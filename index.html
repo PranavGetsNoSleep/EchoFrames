@@ -23,7 +23,7 @@
     /* Left mini visualizer (contained) */
     #miniVisualizer {
       display: flex; align-items: flex-end;
-      gap: 3px; height: 40px; width: 140px;
+      gap: 3px; height: 60px; width: 100px;
       overflow: hidden; /* prevent bleeding */
     }
     .bar {
@@ -41,13 +41,19 @@
       flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
     }
     #audioFile, #imageFiles {
-      color: #ddd; background: #fb8e22; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
+      color: #ddd; background: #333; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
     }
     #playPause {
       background: #333; color: #fff; border: none; border-radius: 4px;
       padding: 6px 12px; cursor: pointer; transition: background 0.2s;
     }
     #playPause:hover { background: #555; }
+
+     #autoCalibrate {
+      background: #333; color: #fff; border: none; border-radius: 4px;
+      padding: 6px 12px; cursor: pointer; transition: background 0.2s;
+    }
+    #autoCalibrate:hover { background: #555; }
 
     /* Progress bar */
     #progressBar {
@@ -71,9 +77,10 @@
       margin-top: -3px; transition: box-shadow 0.2s, transform 0.1s;
     }
     #progressBar:hover::-webkit-slider-thumb { box-shadow: 0 0 14px limegreen; transform: scale(1.05); }
+    
     #progressBar::-moz-range-thumb {
       width: 16px; height: 16px; border-radius: 50%;
-      background: limegreen; box-shadow: 0 0 10px limegreen; border: none;
+      background: limegreen; box-shadow: 0 0 10px rgb(205, 184, 50); border: none;
     }
 
     /* Right info cluster */
@@ -111,15 +118,16 @@
     <!-- Right: controls + timing -->
     <div id="info">
       <label>Sensitivity:</label>
-      <input type="range" id="sensitivitySlider" min="1" max="1000" value="120" step="1" />
+      <input type="range" id="sensitivitySlider" min="1" max="700" value="120" step="1" />
       <span class="value" id="sensitivityValue">120</span>
-      <button id="autoCalibrate">Auto Calibrate</button>
+      
 
       <label>Fade speed:</label>
       <input type="range" id="fadeSlider" min="0.01" max="0.2" value="0.05" step="0.01" />
       <span class="value" id="fadeValue">0.05</span>
 
       <span id="timeDisplay">0:00 / 0:00</span>
+      <button id="autoCalibrate">Auto Calibrate</button>
     </div>
   </div>
 
@@ -371,14 +379,14 @@
       } else {
         ctx.fillStyle = "lime";
         ctx.font = "28px monospace";
-        ctx.fillText("Upload audio + images to begin", 24, 50);
+        ctx.fillText("Upload audio and images to begin", 24, 50);
       }
 
       // Beat detection and image switching
       if (analyser) {
         currentMidEnergy = getMidRangeEnergy(dataArray);
         const threshold = parseInt(sensitivitySlider.value);
-        if (currentMidEnergy > threshold && now - lastBeatTime > 300) {
+        if (currentMidEnergy > threshold && now - lastBeatTime > 800) {
           currentImageIndex = (currentImageIndex + 1) % images.length;
           lastBeatTime = now;
           opacity = 0; fadingIn = true;
@@ -389,10 +397,10 @@
       if (analyser) {
         const barCount = miniBars.length;
         const step = Math.floor(dataArray.length / barCount) || 1;
-        const maxHeight = 30; // keep below container height (40px)
+        const maxHeight = 60; // keep below container height (40px)
         miniBars.forEach((bar, i) => {
           const v = dataArray[i * step] || 0;
-          const h = Math.min(maxHeight, Math.max(6, v / 4)); // gentler scaling
+          const h = Math.min(maxHeight, Math.max(8, v / 4)); // gentler scaling
           bar.style.height = `${h}px`;
         });
       }
