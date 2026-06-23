@@ -1,110 +1,237 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Beat Synced Image Visualizer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root { --progress: 0%; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #000; color: #eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    canvas { display: block; }
+    :root {
+      --progress: 0%;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #000;
+      color: #eee;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
 
     /* Controls bar */
     #controls {
-      position: fixed; bottom: 0; left: 0; width: 100%;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
       background: rgba(20, 20, 20, 0.85);
       border-top: 2px solid #444;
       padding: 10px 14px;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 10px; z-index: 10; backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 10;
+      backdrop-filter: blur(6px);
     }
 
     /* Left mini visualizer (contained) */
     #miniVisualizer {
-      display: flex; align-items: flex-end;
-      gap: 3px; height: 60px; width: 100px;
-      overflow: hidden; /* prevent bleeding */
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 60px;
+      width: 120px;
+      overflow: hidden;
+      /* prevent bleeding */
     }
+
     .bar {
       flex: 1;
       height: 8px;
       border-radius: 2px;
-      background: linear-gradient(to top, #14a02e, #e3d21f); /* green -> yellow */
+      background: linear-gradient(to top, #14a02e, #efd127);
+      /* green -> yellow */
       transition: height 0.08s ease;
-      box-shadow: 0 0 6px rgba(50, 205, 50, 0.6);
+      /* box-shadow: 0 0 6px rgba(50, 205, 50, 0.6);*/
       align-self: flex-end;
     }
 
     /* Center playbar cluster */
     #playbar {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    #audioFile, #imageFiles {
-      color: #ddd; background: #333; border: 1px solid #333; border-radius: 4px; padding: 4px 6px;
-    }
-    #playPause {
-      background: #333; color: #fff; border: none; border-radius: 4px;
-      padding: 6px 12px; cursor: pointer; transition: background 0.2s;
-    }
-    #playPause:hover { background: #555; }
 
-     #autoCalibrate {
-      background: #333; color: #fff; border: none; border-radius: 4px;
-      padding: 6px 12px; cursor: pointer; transition: background 0.2s;
+    #audioFile,
+    #imageFiles {
+      color: limegreen;
+      background: #333;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 4px 6px;
     }
-    #autoCalibrate:hover { background: #555; }
+
+    #imageFiles:hover {
+      background: #555;
+      transition: background 0.2s;
+    }
+
+    #audioFile:hover {
+      background: #555;
+      transition: background 0.2s;
+    }
+
+    #playPause {
+      background: #333;
+      color: limegreen;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #playPause:hover {
+      background: #555;
+    }
+
+    #autoCalibrate {
+      background: #333;
+      color: limegreen;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #autoCalibrate:hover {
+      background: #555;
+    }
 
     /* Progress bar */
     #progressBar {
-      -webkit-appearance: none; appearance: none;
-      width: min(70vw, 700px); height: 10px; border-radius: 5px;
-      background: #222; outline: none; cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      width: min(70vw, 700px);
+      height: 10px;
+      border-radius: 5px;
+      background: #222;
+      outline: none;
+      cursor: pointer;
     }
+
     #progressBar::-webkit-slider-runnable-track {
-      height: 10px; border-radius: 5px;
+      height: 10px;
+      border-radius: 5px;
       background: linear-gradient(to right, limegreen var(--progress), #222 var(--progress));
       box-shadow: inset 0 0 6px #111;
     }
+
     #progressBar::-moz-range-track {
-      height: 10px; border-radius: 5px; background: #222;
+      height: 10px;
+      border-radius: 5px;
+      background: #222;
       box-shadow: inset 0 0 6px #111;
     }
+
     #progressBar::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: limegreen; box-shadow: 0 0 10px limegreen;
-      margin-top: -3px; transition: box-shadow 0.2s, transform 0.1s;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: limegreen;
+      box-shadow: 0 0 10px limegreen;
+      margin-top: -3px;
+      transition: box-shadow 0.2s, transform 0.1s;
     }
-    #progressBar:hover::-webkit-slider-thumb { box-shadow: 0 0 14px limegreen; transform: scale(1.05); }
-    
+
+    #progressBar:hover::-webkit-slider-thumb {
+      box-shadow: 0 0 14px limegreen;
+      transform: scale(1.05);
+    }
+
     #progressBar::-moz-range-thumb {
-      width: 16px; height: 16px; border-radius: 50%;
-      background: limegreen; box-shadow: 0 0 10px rgb(205, 184, 50); border: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: limegreen;
+      box-shadow: 0 0 10px rgb(205, 184, 50);
+      border: none;
     }
 
     /* Right info cluster */
-    #info { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    #info label { color: #ddd; font-size: 14px; }
-    #info input[type="range"] { width: 160px; }
-    #info .value { color: #0f0; font-weight: bold; }
-    #timeDisplay { min-width: 86px; text-align: right; }
+    #info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    #info label {
+      color: #ddd;
+      font-size: 14px;
+    }
+
+    #info input[type="range"] {
+      width: 160px;
+    }
+
+    #info .value {
+      color: #0f0;
+      font-weight: bold;
+    }
+
+    #timeDisplay {
+      min-width: 86px;
+      text-align: right;
+    }
 
     /* Responsive tweaks */
     @media (max-width: 720px) {
-      #miniVisualizer { width: 100px; }
-      #progressBar { width: min(80vw, 500px); }
-      #info input[type="range"] { width: 130px; }
+      #miniVisualizer {
+        width: 100px;
+      }
+
+      #progressBar {
+        width: min(80vw, 500px);
+      }
+
+      #info input[type="range"] {
+        width: 130px;
+      }
     }
   </style>
 </head>
+
 <body>
   <canvas id="stage"></canvas>
 
   <div id="controls">
     <!-- Left: mini visualizer -->
     <div id="miniVisualizer">
-      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
     </div>
 
     <!-- Center: playbar -->
@@ -120,13 +247,13 @@
       <label>Sensitivity:</label>
       <input type="range" id="sensitivitySlider" min="1" max="700" value="120" step="1" />
       <span class="value" id="sensitivityValue">120</span>
-      
+
 
       <label>Fade speed:</label>
       <input type="range" id="fadeSlider" min="0.01" max="0.2" value="0.05" step="0.01" />
       <span class="value" id="fadeValue">0.05</span>
 
-      <span id="timeDisplay">0:00 / 0:00</span>
+      </n><span id="timeDisplay">0:00 / 0:00</span>
       <button id="autoCalibrate">Auto Calibrate</button>
     </div>
   </div>
@@ -154,7 +281,8 @@
     const imageInput = document.getElementById("imageFiles");
 
     // Audio/Web Audio
-    let audio, audioCtx, source, analyser, dataArray;
+    const audio = new Audio();
+    let audioCtx, source, analyser, dataArray;
 
     // Visualizer state
     let images = [];
@@ -207,17 +335,22 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      if (audio && audio.src && audio.src.startsWith('blob:')) {
-         URL.revokeObjectURL(audio.src);
+      if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
       }
       const audioUrl = URL.createObjectURL(file);
-      audio = new Audio(audioUrl);
-      setupWebAudio(audio);
-      wirePlaybackUI(audio);
+      audio.src = audioUrl;
+      audio.load();
+
+      if (!audioCtx) {
+        setupWebAudio(audio);
+        wirePlaybackUI(audio);
+      }
+
       audio.play();
       playPauseBtn.textContent = "Pause";
       startDrawLoop();
-      
+
       setTimeout(() => {
         startContinuousCalibration();
       }, 100);
@@ -257,7 +390,7 @@
     }
 
     function togglePlay(audioEl) {
-      if (!audioEl) return;
+      if (!audioEl || !audioEl.src) return;
       if (audioEl.paused) {
         audioEl.play();
         playPauseBtn.textContent = "Pause";
@@ -282,7 +415,7 @@
       return sum / (end - start);
     }
 
-    // Manual auto-calibrate (3s snapshot)
+    // Manual auto-calibrate (5s snapshot)
     autoCalibrateBtn.addEventListener("click", () => {
       if (!analyser) return;
       let samples = [];
@@ -291,7 +424,7 @@
       function collect() {
         analyser.getByteFrequencyData(dataArray);
         samples.push(getMidRangeEnergy(dataArray));
-        if (performance.now() - startTime < 3000) {
+        if (performance.now() - startTime < 5000) {
           requestAnimationFrame(collect);
         } else {
           const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
@@ -378,15 +511,15 @@
         ctx.globalAlpha = 1;
       } else {
         ctx.fillStyle = "lime";
-        ctx.font = "28px monospace";
-        ctx.fillText("Upload audio and images to begin", 24, 50);
+        ctx.font = "28px Courier New";
+        ctx.fillText(">>>Upload audio and images to begin", 24, 50);
       }
 
       // Beat detection and image switching
       if (analyser) {
         currentMidEnergy = getMidRangeEnergy(dataArray);
         const threshold = parseInt(sensitivitySlider.value);
-        if (currentMidEnergy > threshold && now - lastBeatTime > 800) {
+        if (images.length > 0 && currentMidEnergy > threshold && now - lastBeatTime > 800) {
           currentImageIndex = (currentImageIndex + 1) % images.length;
           lastBeatTime = now;
           opacity = 0; fadingIn = true;
@@ -397,9 +530,9 @@
       if (analyser) {
         const barCount = miniBars.length;
         const step = Math.floor(dataArray.length / barCount) || 1;
-        const maxHeight = 60; // keep below container height (40px)
+        const maxHeight = 60; // keep below container height (60px)
         miniBars.forEach((bar, i) => {
-          const v = dataArray[i * step] || 0;
+          const v = dataArray[(i) * step] || 0;
           const h = Math.min(maxHeight, Math.max(8, v / 4)); // gentler scaling
           bar.style.height = `${h}px`;
         });
@@ -423,4 +556,5 @@
     }
   </script>
 </body>
+
 </html>
